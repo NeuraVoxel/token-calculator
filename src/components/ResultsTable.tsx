@@ -130,6 +130,9 @@ export function ResultsTable({ rows, currencyDisplay, usdToCny, emptyHint }: Pro
                           <p>
                             标价币种 {row.currency} · Input {row.inputRate} / Output{' '}
                             {row.outputRate} 每 1M tokens
+                            {row.cachedRate != null && row.cachedTokens != null && row.cachedTokens > 0
+                              ? ` · 缓存命中 ${row.cachedTokens.toLocaleString()} tokens @ ${row.cachedRate}`
+                              : ''}
                           </p>
                           {row.model.notes && <p>{row.model.notes}</p>}
                           <p className="muted">价格更新于 {row.model.updatedAt}</p>

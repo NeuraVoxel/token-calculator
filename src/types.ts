@@ -68,4 +68,6 @@ export type CostBreakdown = {
   usedLongContext: boolean
   inputRate: number
   outputRate: number
+  cachedRate?: number
+  cachedTokens?: number
 }

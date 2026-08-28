@@ -48,16 +48,27 @@ describe('pricing', () => {
     usePeakHours: false,
   }
 
-  it('uses cache when enabled', () => {
-    const c = calcModelCost(sample, 1_000_000, 0, 0, {
+  it('splits cached and uncached input', () => {
+    // Below long-context threshold: 400 cached @ 0.5 + 600 uncached @ 1
+    const c = calcModelCost(sample, 1000, 0, 0, 400, {
       ...baseOpts,
       useCache: true,
     })
-    expect(c.inputCostNative).toBe(0.5)
+    expect(c.inputCostNative).toBeCloseTo(0.0008, 8)
+    expect(c.cachedTokens).toBe(400)
+  })
+
+  it('clamps cached tokens to input total', () => {
+    const c = calcModelCost(sample, 1000, 0, 0, 5000, {
+      ...baseOpts,
+      useCache: true,
+    })
+    expect(c.cachedTokens).toBe(1000)
+    expect(c.inputCostNative).toBeCloseTo(0.0005, 8)
   })
 
   it('batch overrides cache', () => {
-    const c = calcModelCost(sample, 1_000_000, 1_000_000, 0, {
+    const c = calcModelCost(sample, 1_000_000, 1_000_000, 0, 500_000, {
       ...baseOpts,
       useCache: true,
       useBatch: true,
@@ -67,13 +78,13 @@ describe('pricing', () => {
   })
 
   it('applies long context tier', () => {
-    const c = calcModelCost(sample, 2000, 0, 0, baseOpts)
+    const c = calcModelCost(sample, 2000, 0, 0, 0, baseOpts)
     expect(c.usedLongContext).toBe(true)
     expect(c.inputRate).toBe(2)
   })
 
   it('splits thinking tokens', () => {
-    const c = calcModelCost(sample, 0, 1000, 400, {
+    const c = calcModelCost(sample, 0, 1000, 400, 0, {
       ...baseOpts,
       useThinking: true,
     })
@@ -98,12 +109,12 @@ describe('pricing', () => {
       flags: { supportsCache: true, supportsOffPeak: true },
       updatedAt: '2026-08-28',
     }
-    const idle = calcModelCost(deepseek, 1_000_000, 1_000_000, 0, baseOpts)
+    const idle = calcModelCost(deepseek, 1_000_000, 1_000_000, 0, 0, baseOpts)
     expect(idle.inputRate).toBe(1.5)
     expect(idle.outputRate).toBe(4.5)
     expect(idle.totalNative).toBe(6)
 
-    const peak = calcModelCost(deepseek, 1_000_000, 1_000_000, 0, {
+    const peak = calcModelCost(deepseek, 1_000_000, 1_000_000, 0, 0, {
       ...baseOpts,
       usePeakHours: true,
     })

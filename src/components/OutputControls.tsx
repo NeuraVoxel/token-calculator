@@ -10,6 +10,9 @@ type Props = {
   thinkingEnabled: boolean
   thinkingTokens: string
   onThinkingTokensChange: (v: string) => void
+  cacheEnabled: boolean
+  cachedTokens: string
+  onCachedTokensChange: (v: string) => void
 }
 
 const SCENARIOS: { id: ScenarioId; label: string }[] = [
@@ -29,6 +32,9 @@ export function OutputControls({
   thinkingEnabled,
   thinkingTokens,
   onThinkingTokensChange,
+  cacheEnabled,
+  cachedTokens,
+  onCachedTokensChange,
 }: Props) {
   return (
     <section className="panel" aria-labelledby="output-heading">
@@ -70,6 +76,23 @@ export function OutputControls({
             onChange={(e) => onOutputTokensChange(e.target.value)}
           />
         </div>
+
+        {cacheEnabled && (
+          <div className="field-stack">
+            <label className="label" htmlFor="cached-tokens">
+              缓存命中 tokens
+            </label>
+            <input
+              id="cached-tokens"
+              className="input num-input"
+              inputMode="numeric"
+              placeholder="不超过 input tokens"
+              value={cachedTokens}
+              onChange={(e) => onCachedTokensChange(e.target.value)}
+            />
+            <p className="meta-row">命中部分按缓存价，其余按普通 input 价</p>
+          </div>
+        )}
 
         {thinkingEnabled && (
           <div className="field-stack">

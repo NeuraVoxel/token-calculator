@@ -51,7 +51,7 @@ Rejected for v1: CI price scrapers; Cloudflare Worker backend (may revisit later
 
 | Region | Providers |
 |--------|-----------|
-| Domestic | DeepSeek, 智谱 GLM, MiniMax |
+| Domestic | DeepSeek, 智谱 GLM, Moonshot |
 | International | OpenAI, Anthropic, Google |
 
 Ship **2–4 current flagship / commonly used models per provider** (not the full catalog). Catalog is extensible; UI groups and filters by provider.
@@ -203,7 +203,7 @@ Stack: Vite, React, TypeScript. Minimal CSS (no heavy UI kit required); keep lay
 | Topic | Decision |
 |-------|----------|
 | Product type | Public, China-oriented |
-| Providers | DeepSeek, GLM, MiniMax + OpenAI, Anthropic, Google |
+| Providers | DeepSeek, GLM, Moonshot + OpenAI, Anthropic, Google |
 | Input modes | Text, word count, token count |
 | Output | Scenario presets + manual override |
 | Currency | Live FX + USD/CNY/dual display |

@@ -12,7 +12,13 @@ export function resolveRates(
   model: Model,
   inputTokens: number,
   options: PricingOptions,
-): { inputRate: number; outputRate: number; thinkingRate?: number; usedLongContext: boolean } {
+): {
+  inputRate: number
+  cachedRate?: number
+  outputRate: number
+  thinkingRate?: number
+  usedLongContext: boolean
+} {
   const p = model.pricing
   let inputRate = p.input
   let outputRate = p.output
@@ -44,8 +50,11 @@ export function resolveRates(
       inputRate *= p.offPeakMultiplier!
       outputRate *= p.offPeakMultiplier!
     }
-  } else if (options.useCache && cachedRate != null && model.flags?.supportsCache) {
-    inputRate = cachedRate
+    cachedRate = undefined
+  } else if (
+    !(options.useCache && cachedRate != null && model.flags?.supportsCache)
+  ) {
+    cachedRate = undefined
   }
 
   let thinkingRate =
@@ -56,7 +65,7 @@ export function resolveRates(
     thinkingRate *= p.offPeakMultiplier!
   }
 
-  return { inputRate, outputRate, thinkingRate, usedLongContext }
+  return { inputRate, cachedRate, outputRate, thinkingRate, usedLongContext }
 }
 
 export function calcModelCost(
@@ -64,16 +73,23 @@ export function calcModelCost(
   inputTokens: number,
   outputTokens: number,
   thinkingTokens: number,
+  cachedTokens: number,
   options: PricingOptions,
 ): CostBreakdown {
-  const { inputRate, outputRate, thinkingRate, usedLongContext } = resolveRates(
+  const { inputRate, cachedRate, outputRate, thinkingRate, usedLongContext } = resolveRates(
     model,
     inputTokens,
     options,
   )
 
   const unit = model.pricing.unit ?? UNIT_PER_MILLION
-  const inputCostNative = (inputTokens / unit) * inputRate
+  const cached =
+    cachedRate != null
+      ? Math.min(Math.max(0, cachedTokens), inputTokens)
+      : 0
+  const uncached = inputTokens - cached
+  const inputCostNative =
+    (uncached / unit) * inputRate + (cached / unit) * (cachedRate ?? inputRate)
 
   const think = thinkingRate != null ? Math.min(Math.max(0, thinkingTokens), outputTokens) : 0
   const normalOut = outputTokens - think
@@ -89,6 +105,8 @@ export function calcModelCost(
     usedLongContext,
     inputRate,
     outputRate,
+    cachedRate,
+    cachedTokens: cached,
   }
 }
 

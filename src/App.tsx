@@ -4,7 +4,7 @@ import { OutputControls } from './components/OutputControls'
 import { OptionsBar } from './components/OptionsBar'
 import { QuoteStrip } from './components/QuoteStrip'
 import { ResultsTable } from './components/ResultsTable'
-import { models, providers } from './data/providers'
+import { models } from './data/providers'
 import {
   estimateOutputTokens,
   estimateTokensFromText,
@@ -34,7 +34,7 @@ function parseNonNeg(raw: string): number | null {
 }
 
 export default function App() {
-  const [mode, setMode] = useState<InputMode>('text')
+  const [mode, setMode] = useState<InputMode>('tokens')
   const [text, setText] = useState('')
   const [wordCount, setWordCount] = useState('')
   const [tokenCount, setTokenCount] = useState('')
@@ -42,6 +42,7 @@ export default function App() {
   const [outputTokens, setOutputTokens] = useState('0')
   const [isCustomOutput, setIsCustomOutput] = useState(false)
   const [thinkingTokens, setThinkingTokens] = useState('0')
+  const [cachedTokens, setCachedTokens] = useState('0')
   const [currencyDisplay, setCurrencyDisplay] = useState<CurrencyDisplay>('CNY')
   const [options, setOptions] = useState<PricingOptions>({
     useCache: false,
@@ -50,7 +51,7 @@ export default function App() {
     usePeakHours: false,
   })
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
-    () => new Set(providers.map((p) => p.id)),
+    () => new Set(['deepseek']),
   )
   const [usdToCny, setUsdToCny] = useState(FALLBACK_USD_TO_CNY)
   const [fxSource, setFxSource] = useState<'api' | 'fallback'>('fallback')
@@ -95,6 +96,7 @@ export default function App() {
     isCustomOutput && customOutputParsed != null ? customOutputParsed : scenarioOutput
 
   const thinkingParsed = parseNonNeg(thinkingTokens) ?? 0
+  const cachedParsed = parseNonNeg(cachedTokens) ?? 0
 
   const inputInvalid =
     (mode === 'words' && wordCount.trim() !== '' && parseNonNeg(wordCount) == null) ||
@@ -112,6 +114,7 @@ export default function App() {
           inputTokens,
           effectiveOutputTokens,
           options.useThinking ? thinkingParsed : 0,
+          options.useCache ? cachedParsed : 0,
           options,
         )
         return {
@@ -126,6 +129,7 @@ export default function App() {
     inputTokens,
     effectiveOutputTokens,
     thinkingParsed,
+    cachedParsed,
     options,
     selectedProviders,
     usdToCny,
@@ -190,6 +194,9 @@ export default function App() {
           thinkingEnabled={options.useThinking}
           thinkingTokens={thinkingTokens}
           onThinkingTokensChange={setThinkingTokens}
+          cacheEnabled={options.useCache}
+          cachedTokens={cachedTokens}
+          onCachedTokensChange={setCachedTokens}
         />
 
         <OptionsBar
