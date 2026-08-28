@@ -2,15 +2,15 @@ import type { CostBreakdown, Model, MoneyCurrency, PricingOptions } from '../typ
 import { UNIT_PER_MILLION } from '../types'
 
 /**
- * Batch replaces standard input/output rates.
- * When batch is on, cache toggle is ignored (v1 explicit rule).
- * Long-context tier only swaps base input/output; cache/batch on long tier is out of scope.
+ * Batch replaces standard input/output rates (cache rates ignored under batch).
+ * Long-context tier only swaps base input/output.
  * Listed input/output/cachedInput are peak rates when offPeakMultiplier is set;
  * idle/off-peak = peak × offPeakMultiplier unless usePeakHours is on.
+ * Cache discount applies whenever cachedTokens > 0 and the model lists cachedInput.
  */
 export function resolveRates(
   model: Model,
-  inputTokens: number,
+  totalInputTokens: number,
   options: PricingOptions,
 ): {
   inputRate: number
@@ -25,7 +25,7 @@ export function resolveRates(
   let cachedRate = p.cachedInput
   let usedLongContext = false
 
-  if (p.longContext && inputTokens > p.longContext.thresholdTokens) {
+  if (p.longContext && totalInputTokens > p.longContext.thresholdTokens) {
     inputRate = p.longContext.input
     outputRate = p.longContext.output
     usedLongContext = true
@@ -51,9 +51,7 @@ export function resolveRates(
       outputRate *= p.offPeakMultiplier!
     }
     cachedRate = undefined
-  } else if (
-    !(options.useCache && cachedRate != null && model.flags?.supportsCache)
-  ) {
+  } else if (cachedRate == null || !model.flags?.supportsCache) {
     cachedRate = undefined
   }
 
@@ -70,26 +68,27 @@ export function resolveRates(
 
 export function calcModelCost(
   model: Model,
-  inputTokens: number,
+  uncachedTokens: number,
+  cachedTokens: number,
   outputTokens: number,
   thinkingTokens: number,
-  cachedTokens: number,
   options: PricingOptions,
 ): CostBreakdown {
+  const uncached = Math.max(0, uncachedTokens)
+  const cachedIn = Math.max(0, cachedTokens)
+  const totalInput = uncached + cachedIn
+
   const { inputRate, cachedRate, outputRate, thinkingRate, usedLongContext } = resolveRates(
     model,
-    inputTokens,
+    totalInput,
     options,
   )
 
   const unit = model.pricing.unit ?? UNIT_PER_MILLION
-  const cached =
-    cachedRate != null
-      ? Math.min(Math.max(0, cachedTokens), inputTokens)
-      : 0
-  const uncached = inputTokens - cached
+  // Models without cache pricing bill "缓存读取" at the normal input rate.
+  const effectiveCachedRate = cachedRate ?? inputRate
   const inputCostNative =
-    (uncached / unit) * inputRate + (cached / unit) * (cachedRate ?? inputRate)
+    (uncached / unit) * inputRate + (cachedIn / unit) * effectiveCachedRate
 
   const think = thinkingRate != null ? Math.min(Math.max(0, thinkingTokens), outputTokens) : 0
   const normalOut = outputTokens - think
@@ -105,8 +104,9 @@ export function calcModelCost(
     usedLongContext,
     inputRate,
     outputRate,
-    cachedRate,
-    cachedTokens: cached,
+    cachedRate: cachedRate ?? (cachedIn > 0 ? inputRate : undefined),
+    cachedTokens: cachedIn,
+    uncachedTokens: uncached,
   }
 }
 

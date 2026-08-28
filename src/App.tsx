@@ -37,15 +37,14 @@ export default function App() {
   const [mode, setMode] = useState<InputMode>('tokens')
   const [text, setText] = useState('')
   const [wordCount, setWordCount] = useState('')
-  const [tokenCount, setTokenCount] = useState('')
+  const [uncachedTokens, setUncachedTokens] = useState('')
+  const [cachedTokens, setCachedTokens] = useState('0')
   const [scenario, setScenario] = useState<ScenarioId>('full')
   const [outputTokens, setOutputTokens] = useState('0')
   const [isCustomOutput, setIsCustomOutput] = useState(false)
   const [thinkingTokens, setThinkingTokens] = useState('0')
-  const [cachedTokens, setCachedTokens] = useState('0')
   const [currencyDisplay, setCurrencyDisplay] = useState<CurrencyDisplay>('CNY')
   const [options, setOptions] = useState<PricingOptions>({
-    useCache: false,
     useBatch: false,
     useThinking: false,
     usePeakHours: false,
@@ -68,53 +67,61 @@ export default function App() {
     }
   }, [])
 
-  const inputTokens = useMemo(() => {
+  const cachedParsed =
+    cachedTokens.trim() === '' ? 0 : parseNonNeg(cachedTokens)
+
+  const uncachedParsed = useMemo(() => {
     if (mode === 'text') return estimateTokensFromText(text)
     if (mode === 'words') {
-      const w = parseNonNeg(wordCount)
-      if (w == null) return null
-      return estimateTokensFromWordCount(w)
+      if (wordCount.trim() === '') return 0
+      return parseNonNeg(wordCount) == null
+        ? null
+        : estimateTokensFromWordCount(parseNonNeg(wordCount)!)
     }
-    return parseNonNeg(tokenCount)
-  }, [mode, text, wordCount, tokenCount])
+    if (uncachedTokens.trim() === '') return 0
+    return parseNonNeg(uncachedTokens)
+  }, [mode, text, wordCount, uncachedTokens])
+
+  const totalInput =
+    uncachedParsed != null && cachedParsed != null ? uncachedParsed + cachedParsed : null
 
   const scenarioOutput =
-    inputTokens != null && inputTokens > 0
-      ? estimateOutputTokens(inputTokens, SCENARIO_RATIOS[scenario])
+    totalInput != null && totalInput > 0
+      ? estimateOutputTokens(totalInput, SCENARIO_RATIOS[scenario])
       : 0
 
-  // Keep the output field in sync with scenario unless the user customized it.
   useEffect(() => {
     if (isCustomOutput) return
     setOutputTokens(String(scenarioOutput))
   }, [scenarioOutput, isCustomOutput])
 
   const customOutputParsed = parseNonNeg(outputTokens)
-  // Prefer custom value when valid; otherwise fall back to scenario estimate so
-  // clearing the output field (or leaving it empty) still yields a comparison.
   const effectiveOutputTokens =
     isCustomOutput && customOutputParsed != null ? customOutputParsed : scenarioOutput
 
   const thinkingParsed = parseNonNeg(thinkingTokens) ?? 0
-  const cachedParsed = parseNonNeg(cachedTokens) ?? 0
 
   const inputInvalid =
-    (mode === 'words' && wordCount.trim() !== '' && parseNonNeg(wordCount) == null) ||
-    (mode === 'tokens' && tokenCount.trim() !== '' && parseNonNeg(tokenCount) == null)
+    uncachedParsed == null ||
+    cachedParsed == null ||
+    (outputTokens.trim() !== '' && parseNonNeg(outputTokens) == null)
 
-  const hasValidUsage = inputTokens != null && inputTokens > 0 && !inputInvalid
+  const hasValidUsage =
+    !inputInvalid &&
+    totalInput != null &&
+    (totalInput > 0 || effectiveOutputTokens > 0)
 
   const rows = useMemo(() => {
-    if (!hasValidUsage || inputTokens == null) return []
+    if (!hasValidUsage || uncachedParsed == null || cachedParsed == null) return []
     return models
       .filter((m) => selectedProviders.has(m.providerId))
       .map((m) => {
         const breakdown = calcModelCost(
           m,
-          inputTokens,
+          uncachedParsed,
+          cachedParsed,
           effectiveOutputTokens,
           options.useThinking ? thinkingParsed : 0,
-          options.useCache ? cachedParsed : 0,
           options,
         )
         return {
@@ -126,10 +133,10 @@ export default function App() {
       .sort((a, b) => a.totalUsd - b.totalUsd)
   }, [
     hasValidUsage,
-    inputTokens,
+    uncachedParsed,
+    cachedParsed,
     effectiveOutputTokens,
     thinkingParsed,
-    cachedParsed,
     options,
     selectedProviders,
     usdToCny,
@@ -157,7 +164,6 @@ export default function App() {
 
   function handleOutputChange(v: string) {
     setOutputTokens(v)
-    // Empty field → resume scenario estimate instead of blocking results.
     setIsCustomOutput(v.trim() !== '')
   }
 
@@ -180,23 +186,23 @@ export default function App() {
           onTextChange={setText}
           wordCount={wordCount}
           onWordCountChange={setWordCount}
-          tokenCount={tokenCount}
-          onTokenCountChange={setTokenCount}
-          estimatedInputTokens={inputTokens ?? 0}
+          uncachedTokens={uncachedTokens}
+          onUncachedTokensChange={setUncachedTokens}
+          cachedTokens={cachedTokens}
+          onCachedTokensChange={setCachedTokens}
+          outputTokens={outputTokens}
+          onOutputTokensChange={handleOutputChange}
+          estimatedInputTokens={uncachedParsed ?? 0}
         />
 
         <OutputControls
           scenario={scenario}
           onScenarioChange={handleScenarioChange}
-          outputTokens={outputTokens}
-          onOutputTokensChange={handleOutputChange}
           isCustomOutput={isCustomOutput}
           thinkingEnabled={options.useThinking}
           thinkingTokens={thinkingTokens}
           onThinkingTokensChange={setThinkingTokens}
-          cacheEnabled={options.useCache}
-          cachedTokens={cachedTokens}
-          onCachedTokensChange={setCachedTokens}
+          showScenario
         />
 
         <OptionsBar
@@ -225,7 +231,7 @@ export default function App() {
           emptyHint={
             inputInvalid
               ? '请输入有效的非负数字。'
-              : '在上方选择「Token 数」并填写 input tokens 后，将按总价从低到高排列。'
+              : '填写未缓存输入、缓存读取或输出用量后，将按总价从低到高排列。'
           }
         />
       </main>

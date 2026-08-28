@@ -53,7 +53,6 @@ export function OptionsBar({
         <div className="toggle-row">
           {(
             [
-              ['useCache', '缓存价'],
               ['useBatch', 'Batch'],
               ['useThinking', 'Thinking'],
               ['usePeakHours', '高峰时段'],

@@ -128,10 +128,13 @@ export function ResultsTable({ rows, currencyDisplay, usdToCny, emptyHint }: Pro
                       <td colSpan={5}>
                         <div className="detail">
                           <p>
-                            标价币种 {row.currency} · Input {row.inputRate} / Output{' '}
-                            {row.outputRate} 每 1M tokens
-                            {row.cachedRate != null && row.cachedTokens != null && row.cachedTokens > 0
-                              ? ` · 缓存命中 ${row.cachedTokens.toLocaleString()} tokens @ ${row.cachedRate}`
+                            标价币种 {row.currency} · 未缓存 Input {row.inputRate}
+                            {row.cachedRate != null
+                              ? ` / 缓存读取 ${row.cachedRate}`
+                              : ''}{' '}
+                            / Output {row.outputRate} 每 1M tokens
+                            {row.cachedTokens != null && row.cachedTokens > 0
+                              ? ` · 本次缓存 ${row.cachedTokens.toLocaleString()} tokens`
                               : ''}
                           </p>
                           {row.model.notes && <p>{row.model.notes}</p>}

@@ -42,53 +42,49 @@ describe('estimateOutputTokens', () => {
 
 describe('pricing', () => {
   const baseOpts = {
-    useCache: false,
     useBatch: false,
     useThinking: false,
     usePeakHours: false,
   }
 
-  it('splits cached and uncached input', () => {
-    // Below long-context threshold: 400 cached @ 0.5 + 600 uncached @ 1
-    const c = calcModelCost(sample, 1000, 0, 0, 400, {
-      ...baseOpts,
-      useCache: true,
-    })
+  it('splits uncached and cached input', () => {
+    // Below long-context threshold: 600 uncached @ 1 + 400 cached @ 0.5
+    const c = calcModelCost(sample, 600, 400, 0, 0, baseOpts)
     expect(c.inputCostNative).toBeCloseTo(0.0008, 8)
     expect(c.cachedTokens).toBe(400)
+    expect(c.uncachedTokens).toBe(600)
   })
 
-  it('clamps cached tokens to input total', () => {
-    const c = calcModelCost(sample, 1000, 0, 0, 5000, {
-      ...baseOpts,
-      useCache: true,
-    })
-    expect(c.cachedTokens).toBe(1000)
-    expect(c.inputCostNative).toBeCloseTo(0.0005, 8)
+  it('bills cached at input rate when model has no cache price', () => {
+    const noCache: Model = {
+      ...sample,
+      pricing: { ...sample.pricing, cachedInput: undefined },
+      flags: { supportsBatch: true, supportsThinking: true },
+    }
+    const c = calcModelCost(noCache, 500, 500, 0, 0, baseOpts)
+    expect(c.inputCostNative).toBeCloseTo(0.001, 8)
   })
 
   it('batch overrides cache', () => {
-    const c = calcModelCost(sample, 1_000_000, 1_000_000, 0, 500_000, {
+    const c = calcModelCost(sample, 500_000, 500_000, 1_000_000, 0, {
       ...baseOpts,
-      useCache: true,
       useBatch: true,
     })
     expect(c.inputCostNative).toBe(0.4)
     expect(c.outputCostNative).toBe(0.8)
   })
 
-  it('applies long context tier', () => {
-    const c = calcModelCost(sample, 2000, 0, 0, 0, baseOpts)
+  it('applies long context tier on total input', () => {
+    const c = calcModelCost(sample, 1500, 600, 0, 0, baseOpts)
     expect(c.usedLongContext).toBe(true)
     expect(c.inputRate).toBe(2)
   })
 
   it('splits thinking tokens', () => {
-    const c = calcModelCost(sample, 0, 1000, 400, 0, {
+    const c = calcModelCost(sample, 0, 0, 1000, 400, {
       ...baseOpts,
       useThinking: true,
     })
-    // 600 * 2 / 1e6 + 400 * 3 / 1e6
     expect(c.outputCostNative).toBeCloseTo(0.0024, 8)
   })
 
@@ -109,12 +105,12 @@ describe('pricing', () => {
       flags: { supportsCache: true, supportsOffPeak: true },
       updatedAt: '2026-08-28',
     }
-    const idle = calcModelCost(deepseek, 1_000_000, 1_000_000, 0, 0, baseOpts)
+    const idle = calcModelCost(deepseek, 1_000_000, 0, 1_000_000, 0, baseOpts)
     expect(idle.inputRate).toBe(1.5)
     expect(idle.outputRate).toBe(4.5)
     expect(idle.totalNative).toBe(6)
 
-    const peak = calcModelCost(deepseek, 1_000_000, 1_000_000, 0, 0, {
+    const peak = calcModelCost(deepseek, 1_000_000, 0, 1_000_000, 0, {
       ...baseOpts,
       usePeakHours: true,
     })

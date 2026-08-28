@@ -52,7 +52,6 @@ export type CurrencyDisplay = 'USD' | 'CNY' | 'both'
 export type ScenarioId = 'classify' | 'rag' | 'chat' | 'full' | 'long'
 
 export type PricingOptions = {
-  useCache: boolean
   useBatch: boolean
   useThinking: boolean
   /** When true, use peak list prices; when false, apply offPeakMultiplier if present. */
@@ -70,4 +69,5 @@ export type CostBreakdown = {
   outputRate: number
   cachedRate?: number
   cachedTokens?: number
+  uncachedTokens?: number
 }
